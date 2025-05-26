@@ -1,6 +1,14 @@
 version: 0.2
 
 phases:
+  install:
+    runtime-versions:
+      java: corretto11
+    commands:
+      - echo Installing dependencies...
+      - apt-get update
+      - apt-get install -y curl
+
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...
@@ -15,11 +23,14 @@ phases:
   build:
     commands:
       - echo Build started on `date`
-      - echo Building the Docker image...
       - cd internet-banking-concept-microservices
       - ls -la
       - cd internet-banking-config-server
       - ls -la
+      - echo Building the application with Gradle...
+      - chmod +x ./gradlew
+      - ./gradlew clean build -x test
+      - echo Building the Docker image...
       - docker build -t $REPOSITORY_URI:latest .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   
