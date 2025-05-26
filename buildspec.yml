@@ -30,6 +30,8 @@ phases:
       - chmod +x ./gradlew
       - ./gradlew clean build -x test --warning-mode all --stacktrace
       - echo Building the Docker image...
+      # Pull base images before building to avoid rate limits
+      - docker pull openjdk:11-jre-slim || true
       - docker build -t $REPOSITORY_URI:latest .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   
