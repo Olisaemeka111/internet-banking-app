@@ -36,10 +36,12 @@ phases:
       - docker pull public.ecr.aws/docker/library/openjdk:11-jre-slim || true
       - pwd
       - ls -la
+      - JAR_FILE=$(ls build/libs/*.jar | head -n 1)
+      - JAR_FILENAME=$(basename $JAR_FILE)
       - echo "FROM public.ecr.aws/docker/library/openjdk:11-jre-slim" > Dockerfile
       - echo "WORKDIR /app" >> Dockerfile
-      - echo "COPY build/libs/*.jar /app/" >> Dockerfile
-      - echo "ENTRYPOINT [\"java\", \"-jar\", \"/app/*.jar\"]" >> Dockerfile
+      - echo "COPY build/libs/internet-banking-config-server-0.0.1-SNAPSHOT.jar /app/app.jar" >> Dockerfile
+      - echo "ENTRYPOINT [\"java\", \"-jar\", \"-Dspring.profiles.active=docker\", \"/app/app.jar\"]" >> Dockerfile
       - cat Dockerfile
       - docker build -t $REPOSITORY_URI:latest .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
