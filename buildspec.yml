@@ -12,6 +12,12 @@ phases:
     commands:
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+      # Create Docker Hub credentials file to avoid rate limits
+      - echo Authenticating with Docker Hub to avoid rate limits...
+      - aws secretsmanager get-secret-value --secret-id dockerhub-credentials --query SecretString --output text --region $AWS_REGION > dockerhub.json || echo '{"username":"anonymous","password":""}' > dockerhub.json
+      - export DOCKER_USERNAME=$(cat dockerhub.json | jq -r '.username')
+      - export DOCKER_PASSWORD=$(cat dockerhub.json | jq -r '.password')
+      - if [ "$DOCKER_USERNAME" != "anonymous" ]; then echo $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin; fi
       - REPOSITORY_URI=$ECR_REPOSITORY_URI
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
@@ -32,6 +38,8 @@ phases:
       - echo Building the Docker image...
       # Pull base images before building to avoid rate limits
       - docker pull openjdk:11-jre-slim || true
+      - pwd
+      - ls -la
       - docker build -t $REPOSITORY_URI:latest .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   
@@ -42,9 +50,11 @@ phases:
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - echo Writing image definitions file...
+      - mkdir -p /codebuild/output
       - cd /codebuild/output
-      - printf '[{"name":"internet-banking-config-server","imageUri":"%s"}]' "$REPOSITORY_URI:$IMAGE_TAG" > imagedefinitions.json
+      - echo "[{\"name\":\"${ENVIRONMENT}-internet-banking-config-server\",\"imageUri\":\"${REPOSITORY_URI}:${IMAGE_TAG}\"}]" > imagedefinitions.json
       - cat imagedefinitions.json
+      - ls -la /codebuild/output
 
 artifacts:
   files:
