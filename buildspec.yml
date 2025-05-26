@@ -52,7 +52,7 @@ phases:
       - echo Writing image definitions file...
       - mkdir -p /codebuild/output
       - cd /codebuild/output
-      - echo "[{\"name\":\"${ENVIRONMENT}-internet-banking-config-server\",\"imageUri\":\"${REPOSITORY_URI}:${IMAGE_TAG}\"}]" > imagedefinitions.json
+      - echo "[{\"name\":\"internet-banking-config-server\",\"imageUri\":\"${REPOSITORY_URI}:${IMAGE_TAG}\"}]" > imagedefinitions.json
       - cat imagedefinitions.json
       - ls -la /codebuild/output
 
