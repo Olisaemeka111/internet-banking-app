@@ -3,7 +3,7 @@ version: 0.2
 phases:
   install:
     runtime-versions:
-      java: corretto17
+      java: corretto11
     commands:
       - echo Installing dependencies...
       - yum install -y curl
@@ -28,7 +28,7 @@ phases:
       - ls -la
       - echo Building the application with Gradle...
       - chmod +x ./gradlew
-      - ./gradlew clean build -x test
+      - ./gradlew clean build -x test --warning-mode all --stacktrace
       - echo Building the Docker image...
       - docker build -t $REPOSITORY_URI:latest .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
