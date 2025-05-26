@@ -61,7 +61,21 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
           "ecs:DescribeTasks",
           "ecs:ListTasks",
           "ecs:RegisterTaskDefinition",
-          "ecs:UpdateService"
+          "ecs:UpdateService",
+          "ecs:CreateService",
+          "ecs:DeleteService",
+          "ecs:ListServices",
+          "ecs:ListTaskDefinitions",
+          "ecs:ListClusters",
+          "ecs:RunTask",
+          "ecs:StopTask",
+          "ecs:DeregisterTaskDefinition",
+          "ecs:DescribeClusters",
+          "ecs:CreateTaskSet",
+          "ecs:UpdateTaskSet",
+          "ecs:DeleteTaskSet",
+          "ecs:UpdateClusterSettings",
+          "ecs:PutClusterCapacityProviders"
         ]
         Effect = "Allow"
         Resource = "*"
@@ -78,7 +92,12 @@ resource "aws_iam_role_policy" "codepipeline_policy" {
           "iam:PassRole"
         ]
         Effect = "Allow"
-        Resource = "*"
+        Resource = [
+          "arn:aws:iam::${var.aws_account_id}:role/${var.environment}-ecs-task-role",
+          "arn:aws:iam::${var.aws_account_id}:role/${var.environment}-ecs-task-execution-role",
+          "arn:aws:iam::${var.aws_account_id}:role/ecsTaskExecutionRole",
+          "arn:aws:iam::${var.aws_account_id}:role/*"
+        ]
       }
     ]
   })
@@ -275,7 +294,7 @@ resource "aws_codepipeline" "service_pipelines" {
 
       configuration = {
         ClusterName = "${var.environment}-internet-banking-cluster"
-        ServiceName = each.value.name
+        ServiceName = "${var.environment}-${each.value.name}"
         FileName    = "imagedefinitions.json"
       }
     }
