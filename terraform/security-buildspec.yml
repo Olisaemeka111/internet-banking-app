@@ -1,0 +1,77 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+    commands:
+      - echo Installing tfsec...
+      - curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+      - echo Installing checkov...
+      - pip install checkov
+      - echo Installing terraform...
+      - curl -s https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip -o terraform.zip
+      - unzip terraform.zip
+      - mv terraform /usr/local/bin/
+      - echo Installation completed
+
+  pre_build:
+    commands:
+      - echo Starting security scanning...
+      - cd $CODEBUILD_SRC_DIR/terraform
+
+  build:
+    commands:
+      # Run tfsec scan
+      - echo Running tfsec scan...
+      - tfsec . --format json > tfsec-report.json || true
+      - tfsec . --format junit > tfsec-report-junit.xml || true
+      - tfsec . --format markdown > tfsec-report.md || true
+      
+      # Run checkov scan
+      - echo Running checkov scan...
+      - checkov -d . --output json > checkov-report.json || true
+      - checkov -d . --output junitxml > checkov-report-junit.xml || true
+      - checkov -d . --output markdown > checkov-report.md || true
+      
+      # Combine reports for summary
+      - echo Generating summary report...
+      - echo "# Security Scan Summary" > security-summary.md
+      - echo "## tfsec findings" >> security-summary.md
+      - cat tfsec-report.md >> security-summary.md
+      - echo "## checkov findings" >> security-summary.md
+      - cat checkov-report.md >> security-summary.md
+
+  post_build:
+    commands:
+      - echo Security scanning completed on `date`
+      - echo Check the artifacts for detailed reports
+      - |
+        if [ -s tfsec-report.json ] || [ -s checkov-report.json ]; then
+          echo "Security issues found. Please review the reports."
+          # Uncomment the line below to fail the build if security issues are found
+          # exit 1
+        else
+          echo "No security issues found."
+        fi
+
+artifacts:
+  files:
+    - terraform/tfsec-report.json
+    - terraform/tfsec-report-junit.xml
+    - terraform/tfsec-report.md
+    - terraform/checkov-report.json
+    - terraform/checkov-report-junit.xml
+    - terraform/checkov-report.md
+    - terraform/security-summary.md
+  discard-paths: no
+
+reports:
+  tfsec-reports:
+    files:
+      - terraform/tfsec-report-junit.xml
+    file-format: JUNITXML
+  checkov-reports:
+    files:
+      - terraform/checkov-report-junit.xml
+    file-format: JUNITXML
