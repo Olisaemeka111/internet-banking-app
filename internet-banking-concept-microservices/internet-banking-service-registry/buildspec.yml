@@ -1,0 +1,76 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto11
+    commands:
+      - echo Installing dependencies...
+      - yum install -y curl
+
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+      # Use direct image references to avoid Docker Hub rate limits
+      - echo Using direct ECR Public Gallery references to avoid rate limits...
+      - REPOSITORY_URI=$ECR_REPOSITORY_URI
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - echo Repository URI $REPOSITORY_URI
+      - echo Image tag $IMAGE_TAG
+      - ls -la
+  
+  build:
+    commands:
+      - echo Build started on `date`
+      - ls -la
+      - echo Building the application with Gradle...
+      - chmod +x ./gradlew
+      - ./gradlew clean build -x test --warning-mode all --stacktrace
+      - echo Building the Docker image...
+      # Pull base images before building to avoid rate limits
+      - docker pull eclipse-temurin:21.0.2_13-jre-alpine || true
+      - pwd
+      - ls -la
+      - echo "FROM eclipse-temurin:21.0.2_13-jre-alpine" > Dockerfile
+      - echo "LABEL maintainer=\"chinthaka@javatodev.com\"" >> Dockerfile
+      - echo "VOLUME /main-app" >> Dockerfile
+      - echo "ADD build/libs/internet-banking-service-registry-0.0.1-SNAPSHOT.jar /app/app.jar" >> Dockerfile
+      - echo "EXPOSE 8081" >> Dockerfile
+      - echo "COPY wait-for-it.sh wait-for-it.sh" >> Dockerfile
+      - echo "RUN chmod +x wait-for-it.sh" >> Dockerfile
+      - echo "RUN apk add --no-cache bash" >> Dockerfile
+      - echo "ENTRYPOINT [\"java\", \"-jar\", \"-Dspring.profiles.active=docker\", \"/app/app.jar\"]" >> Dockerfile
+      - cat Dockerfile
+      - docker build -t $REPOSITORY_URI:latest .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+  
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker image...
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - echo Writing image definitions file...
+      - mkdir -p /codebuild/output
+      - cd /codebuild/output
+      - echo "[{\"name\":\"internet-banking-service-registry\",\"imageUri\":\"${REPOSITORY_URI}:${IMAGE_TAG}\"}]" > imagedefinitions.json
+      - cat imagedefinitions.json
+      - echo "Preparing task definition and appspec files..."
+      - cp $CODEBUILD_SRC_DIR/internet-banking-concept-microservices/internet-banking-service-registry/appspec.yml /codebuild/output/
+      - cp $CODEBUILD_SRC_DIR/internet-banking-concept-microservices/internet-banking-service-registry/taskdef.json /codebuild/output/
+      - sed -i "s|<IMAGE_NAME>|${REPOSITORY_URI}:${IMAGE_TAG}|g" /codebuild/output/taskdef.json
+      - sed -i "s|<TASK_DEFINITION>|arn:aws:ecs:us-east-1:156041437006:task-definition/dev-internet-banking-service-registry:2|g" /codebuild/output/appspec.yml
+      - ls -la /codebuild/output
+
+artifacts:
+  files:
+    - imagedefinitions.json
+    - appspec.yml
+    - taskdef.json
+
+cache:
+  paths:
+    - '/root/.gradle/caches/**/*'
+    - '/root/.gradle/wrapper/**/*'

@@ -1,0 +1,39 @@
+{
+  "family": "dev-internet-banking-service-registry",
+  "executionRoleArn": "arn:aws:iam::156041437006:role/dev-ecs-task-execution-role",
+  "taskRoleArn": "arn:aws:iam::156041437006:role/dev-ecs-task-role",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "internet-banking-service-registry",
+      "image": "<IMAGE_NAME>",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8081,
+          "hostPort": 8081,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "dev"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/dev/dev-internet-banking-service-registry",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "256",
+  "memory": "512"
+}
