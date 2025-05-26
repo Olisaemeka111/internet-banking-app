@@ -13,13 +13,42 @@ phases:
       - export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
       - export PATH=$PATH:$JAVA_HOME/bin
       - java -version || true
+      - echo "Service name is $SERVICE_NAME"
+      - ls -la
   
   build:
     commands:
       - echo Build started on `date`
       - echo Building the Docker image...
+      - |
+        if [ "$SERVICE_NAME" = "internet-banking-config-server" ]; then
+          cd internet-banking-concept-microservices/internet-banking-config-server
+        elif [ "$SERVICE_NAME" = "internet-banking-service-registry" ]; then
+          cd internet-banking-concept-microservices/internet-banking-service-registry
+        elif [ "$SERVICE_NAME" = "internet-banking-api-gateway" ]; then
+          cd internet-banking-concept-microservices/internet-banking-api-gateway
+        elif [ "$SERVICE_NAME" = "internet-banking-user-service" ]; then
+          cd internet-banking-concept-microservices/internet-banking-user-service
+        elif [ "$SERVICE_NAME" = "internet-banking-fund-transfer-service" ]; then
+          cd internet-banking-concept-microservices/internet-banking-fund-transfer-service
+        elif [ "$SERVICE_NAME" = "internet-banking-utility-payment-service" ]; then
+          cd internet-banking-concept-microservices/internet-banking-utility-payment-service
+        elif [ "$SERVICE_NAME" = "core-banking-service" ]; then
+          cd internet-banking-concept-microservices/core-banking-service
+        elif [ "$SERVICE_NAME" = "keycloak" ]; then
+          cd internet-banking-concept-microservices/docker-compose/keycloak
+        elif [ "$SERVICE_NAME" = "zipkin" ]; then
+          echo "Using Zipkin from Docker Hub"
+          docker pull openzipkin/zipkin:latest
+          docker tag openzipkin/zipkin:latest $REPOSITORY_URI:latest
+          docker tag openzipkin/zipkin:latest $REPOSITORY_URI:$IMAGE_TAG
+          exit 0
+        else
+          echo "Unknown service: $SERVICE_NAME"
+          exit 1
+        fi
+      - echo "Building from directory $(pwd)"
       - ls -la
-      - echo "Building service $SERVICE_NAME"
       - docker build -t $REPOSITORY_URI:latest .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   
