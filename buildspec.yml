@@ -6,7 +6,6 @@ phases:
       java: corretto11
     commands:
       - echo Installing dependencies...
-      - yum update -y
       - yum install -y curl
 
   pre_build:
