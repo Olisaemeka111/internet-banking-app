@@ -8,8 +8,8 @@ phases:
       - REPOSITORY_URI=$ECR_REPOSITORY_URI
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
-      - echo "Repository URI: $REPOSITORY_URI"
-      - echo "Image tag: $IMAGE_TAG"
+      - echo Repository URI $REPOSITORY_URI
+      - echo Image tag $IMAGE_TAG
       - ls -la
   
   build:
@@ -30,9 +30,11 @@ phases:
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
       - echo Writing image definitions file...
-      - echo '[{"name":"internet-banking-config-server","imageUri":"'$REPOSITORY_URI:$IMAGE_TAG'"}]' > imagedefinitions.json
+      - cd /codebuild/output
+      - echo [{\"name\":\"internet-banking-config-server\",\"imageUri\":\"$REPOSITORY_URI:$IMAGE_TAG\"}] > imagedefinitions.json
       - cat imagedefinitions.json
 
 artifacts:
   files:
     - imagedefinitions.json
+  base-directory: /codebuild/output
