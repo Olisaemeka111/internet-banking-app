@@ -130,7 +130,7 @@ resource "aws_lambda_function" "security_notification" {
   function_name = "${var.environment}-internet-banking-security-notification"
   role          = aws_iam_role.security_notification_role.arn
   handler       = "index.handler"
-  runtime       = "nodejs14.x"
+  runtime       = "nodejs20.x"
   timeout       = 30
 
   filename         = data.archive_file.security_notification_zip.output_path

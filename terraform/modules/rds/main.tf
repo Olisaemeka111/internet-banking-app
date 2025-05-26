@@ -80,7 +80,7 @@ resource "aws_db_parameter_group" "postgres" {
 resource "aws_db_instance" "postgres" {
   identifier             = "${var.environment}-keycloak-postgres"
   engine                 = "postgres"
-  engine_version         = "15.3"
+  engine_version         = "15.13"
   instance_class         = "db.t3.medium"
   allocated_storage      = 20
   max_allocated_storage  = 100

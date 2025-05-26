@@ -13,6 +13,16 @@ phases:
       - export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
       - export PATH=$PATH:$JAVA_HOME/bin
       - java -version
+      
+      # Install security scanning tools
+      - echo Installing security scanning tools...
+      - pip3 install checkov
+      - curl -sSL https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+      
+      # Run security scans
+      - echo Running security scans...
+      - chmod +x ./security-scan.sh
+      - ./security-scan.sh
   
   build:
     commands:

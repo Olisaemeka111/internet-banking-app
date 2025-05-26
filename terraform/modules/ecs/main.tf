@@ -113,7 +113,8 @@ resource "aws_lb" "network" {
   enable_deletion_protection = var.environment == "prod" ? true : false
   
   tags = {
-    Name = "${var.environment}-network-lb"
+    Name        = "${var.environment}-network-lb"
+    Environment = var.environment
   }
 }
 
@@ -209,6 +210,8 @@ resource "aws_lb_target_group" "private" {
 
 # Listener for public ALB (HTTPS)
 resource "aws_lb_listener" "public_https" {
+  count = var.certificate_arn != null ? 1 : 0
+  
   load_balancer_arn = aws_lb.public.arn
   port              = 443
   protocol          = "HTTPS"
@@ -264,7 +267,7 @@ resource "aws_lb_listener" "internal" {
 resource "aws_lb_listener_rule" "public" {
   for_each = local.public_services
   
-  listener_arn = aws_lb_listener.public_https.arn
+  listener_arn = var.certificate_arn != null ? aws_lb_listener.public_https[0].arn : aws_lb_listener.public_http.arn
   priority     = 100 + index(keys(local.public_services), each.key)
   
   action {
@@ -363,6 +366,13 @@ resource "aws_ecs_task_definition" "services" {
 resource "aws_ecs_service" "public" {
   for_each = local.public_services
   
+  # Ensure the load balancer and listener rules are created before the ECS service
+  depends_on = [
+    aws_lb.public,
+    aws_lb_listener.public_http,
+    aws_lb_listener_rule.public
+  ]
+  
   name            = "${var.environment}-${each.value.name}"
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.services[each.key].arn
@@ -379,6 +389,7 @@ resource "aws_ecs_service" "public" {
     assign_public_ip = false
   }
   
+  # Ensure proper load balancer configuration
   load_balancer {
     target_group_arn = aws_lb_target_group.public[each.key].arn
     container_name   = each.value.name

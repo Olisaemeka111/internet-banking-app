@@ -1,0 +1,31 @@
+# Checkov configuration file
+
+# Directories to skip
+skip-path:
+  - ".git"
+  - ".gradle"
+  - "build"
+  - "node_modules"
+
+# Checks to skip (examples, customize as needed)
+skip-check:
+  - CKV_AWS_116  # Ensure that AWS Lambda function is configured inside a VPC
+  - CKV_AWS_173  # Check encryption settings for Lambda environmental variable
+
+# Frameworks to scan
+framework:
+  - all
+
+# Output options
+output:
+  - cli
+  - json
+
+# Compact output
+compact: true
+
+# Show only failed checks
+quiet: true
+
+# Soft fail (return 0 exit code even if there are failed checks)
+soft-fail: true

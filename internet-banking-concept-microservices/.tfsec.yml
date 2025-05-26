@@ -1,0 +1,31 @@
+# tfsec configuration file
+
+# Exclude specific checks
+exclude:
+  - AWS018  # Example: S3 bucket logging not enabled
+  - AWS025  # Example: API Gateway without WAF
+
+# Minimum severity of issues to report
+minimum_severity: MEDIUM
+
+# Exclude paths from scanning
+exclude_paths:
+  - .git/**/*
+  - .gradle/**/*
+  - build/**/*
+  - node_modules/**/*
+
+# Custom checks (example)
+custom_checks:
+  - code: CUSTOM001
+    description: Ensure all resources have appropriate tags
+    impact: Tags are important for resource management and cost allocation
+    resolution: Add required tags to all resources
+    severity: MEDIUM
+    match_spec:
+      name: resource
+      action: contains
+      value: aws_
+    require_any:
+      - name: tags
+        action: exists

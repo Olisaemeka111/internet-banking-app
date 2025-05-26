@@ -28,12 +28,109 @@ The infrastructure deploys the Internet Banking Microservices application with t
 - **Amazon Route 53**: DNS management
 - **AWS Certificate Manager**: SSL/TLS certificate management
 - **Amazon CloudWatch**: Monitoring, logging, and alerting
-- **AWS Secrets Manager**: Secure credential management
+- **AWS WAF**: Web Application Firewall for security
+- **AWS CodePipeline & CodeBuild**: CI/CD and security scanning
 
 The architecture follows a multi-tier design with:
 - Public-facing load balancers in public subnets
 - Application services in private subnets
 - Databases and caches in isolated private subnets
+
+## Infrastructure Diagram
+
+```
++----------------------------------------------------------------------------------------------------------+
+|                                            AWS Cloud                                                      |
++----------------------------------------------------------------------------------------------------------+
+|                                                                                                          |
+|  +------------------------------------+  +------------------------------------+                            |
+|  |           Region: us-east-1       |  |           Route53                 |                            |
+|  +------------------------------------+  |                                    |                            |
+|  |                                    |  |  +----------------------------+   |                            |
+|  |  +----------------------------+    |  |  |     Hosted Zone           |   |                            |
+|  |  |          VPC              |    |  |  +----------------------------+   |                            |
+|  |  +----------------------------+    |  +------------------------------------+                            |
+|  |  |                            |    |                                                                   |
+|  |  |  +---------------------+   |    |  +------------------------------------+                            |
+|  |  |  |  Public Subnet AZ1  |   |    |  |             WAF                   |                            |
+|  |  |  +---------------------+   |    |  |                                    |                            |
+|  |  |  | Internet Gateway    |   |    |  |  +----------------------------+   |                            |
+|  |  |  | NAT Gateway         |   |    |  |  |      Web ACL              |   |                            |
+|  |  |  | Public ALB          |<--|-------|--|      Rules                |   |                            |
+|  |  |  +---------------------+   |    |  |  +----------------------------+   |                            |
+|  |  |                            |    |  +------------------------------------+                            |
+|  |  |  +---------------------+   |    |                                                                   |
+|  |  |  |  Public Subnet AZ2  |   |    |  +------------------------------------+                            |
+|  |  |  +---------------------+   |    |  |         CloudWatch               |                            |
+|  |  |  | NAT Gateway         |   |    |  |                                    |                            |
+|  |  |  +---------------------+   |    |  |  +----------------------------+   |                            |
+|  |  |                            |    |  |  |      Dashboards           |   |                            |
+|  |  |  +---------------------+   |    |  |  |      Log Groups           |   |                            |
+|  |  |  | Private Subnet AZ1  |   |    |  |  |      Alarms               |   |                            |
+|  |  |  +---------------------+   |    |  |  |      Metrics              |   |                            |
+|  |  |  | ECS Services:       |   |    |  |  +----------------------------+   |                            |
+|  |  |  | - API Gateway       |   |    |  +------------------------------------+                            |
+|  |  |  | - Core Banking       |   |    |                                                                   |
+|  |  |  | - Fund Transfer      |   |    |  +------------------------------------+                            |
+|  |  |  | - User Service       |   |    |  |         CodePipeline              |                            |
+|  |  |  | - Utility Payment    |   |    |  |                                    |                            |
+|  |  |  | - Keycloak           |   |    |  |  +----------------------------+   |                            |
+|  |  |  | - Zipkin             |   |    |  |  |      Security Scanning    |   |                            |
+|  |  |  +---------------------+   |    |  |  +----------------------------+   |                            |
+|  |  |                            |    |  +------------------------------------+                            |
+|  |  |  +---------------------+   |    |                                                                   |
+|  |  |  | Private Subnet AZ2  |   |    |  +------------------------------------+                            |
+|  |  |  +---------------------+   |    |  |         Service Discovery         |                            |
+|  |  |  | ECS Services:       |   |    |  |                                    |                            |
+|  |  |  | - Config Server     |   |    |  |  +----------------------------+   |                            |
+|  |  |  | - Service Registry  |   |    |  |  |      Private DNS          |   |                            |
+|  |  |  | Network LB          |   |    |  |  |      Namespace            |   |                            |
+|  |  |  | Internal ALB        |   |    |  |  +----------------------------+   |                            |
+|  |  |  +---------------------+   |    |  +------------------------------------+                            |
+|  |  |                            |    |                                                                   |
+|  |  |  +---------------------+   |    |  +------------------------------------+                            |
+|  |  |  | Database Subnet AZ1 |   |    |  |         RDS                       |                            |
+|  |  |  +---------------------+   |    |  |                                    |                            |
+|  |  |  | MySQL RDS           |   |    |  |  +----------------------------+   |                            |
+|  |  |  | PostgreSQL RDS      |   |    |  |  |      MySQL Instance       |   |                            |
+|  |  |  +---------------------+   |    |  |  |      PostgreSQL Instance  |   |                            |
+|  |  |                            |    |  |  +----------------------------+   |                            |
+|  |  |  +---------------------+   |    |  +------------------------------------+                            |
+|  |  |  | Database Subnet AZ2 |   |    |                                                                   |
+|  |  |  +---------------------+   |    |  +------------------------------------+                            |
+|  |  |  | Redis ElastiCache   |   |    |  |         ElastiCache               |                            |
+|  |  |  +---------------------+   |    |  |                                    |                            |
+|  |  |                            |    |  |  +----------------------------+   |                            |
+|  |  +----------------------------+    |  |  |      Redis Cluster        |   |                            |
+|  |                                    |  |  +----------------------------+   |                            |
+|  +------------------------------------+  +------------------------------------+                            |
+|                                                                                                          |
++----------------------------------------------------------------------------------------------------------+
+```
+
+### Network Flow and Connectivity
+
+1. **External Traffic Flow**:
+   - Internet traffic enters through the Internet Gateway
+   - Passes through WAF for security filtering
+   - Routed to the Public Application Load Balancer in public subnets
+   - ALB routes traffic to ECS services in private subnets
+
+2. **Internal Service Communication**:
+   - Microservices communicate via Service Discovery (AWS Cloud Map)
+   - Internal Application Load Balancer handles service-to-service traffic
+   - Network Load Balancer supports API Gateway VPC Link integration
+
+3. **Data Tier Access**:
+   - ECS services in private subnets connect to:
+     - RDS MySQL for core banking data
+     - RDS PostgreSQL for Keycloak authentication
+     - ElastiCache Redis for caching and session management
+
+4. **Monitoring and Security**:
+   - CloudWatch collects logs and metrics from all components
+   - WAF protects public endpoints from common web exploits
+   - Security scanning pipeline continuously checks infrastructure for vulnerabilities
 
 ## Prerequisites
 

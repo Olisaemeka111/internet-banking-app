@@ -192,13 +192,29 @@ resource "aws_sns_topic" "alarms" {
   }
 }
 
+# Create log groups for each service first
+resource "aws_cloudwatch_log_group" "service_logs" {
+  for_each = var.ecs_services
+  
+  name              = "/ecs/${var.environment}/${each.value.name}"
+  retention_in_days = 30
+  
+  tags = {
+    Name        = "/ecs/${var.environment}/${each.value.name}"
+    Environment = var.environment
+    Service     = each.key
+  }
+}
+
 # CloudWatch Log Metric Filters for Error Logs
 resource "aws_cloudwatch_log_metric_filter" "error_logs" {
   for_each = var.ecs_services
   
   name           = "${var.environment}-${each.key}-error-logs"
   pattern        = "ERROR"
-  log_group_name = "/ecs/${var.environment}/${each.value.name}"
+  log_group_name = aws_cloudwatch_log_group.service_logs[each.key].name
+  
+  depends_on = [aws_cloudwatch_log_group.service_logs]
   
   metric_transformation {
     name      = "${each.key}ErrorCount"

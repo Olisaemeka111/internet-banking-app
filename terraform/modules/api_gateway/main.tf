@@ -52,6 +52,13 @@ resource "aws_api_gateway_method" "proxy" {
   }
 }
 
+# Format the target URL for API Gateway integration
+locals {
+  formatted_urls = {
+    for k, v in var.api_services : k => format("http://%s", v.target_url)
+  }
+}
+
 resource "aws_api_gateway_integration" "proxy" {
   for_each = var.api_services
   
@@ -60,7 +67,7 @@ resource "aws_api_gateway_integration" "proxy" {
   http_method             = aws_api_gateway_method.proxy[each.key].http_method
   integration_http_method = "ANY"
   type                    = "HTTP_PROXY"
-  uri                     = "http://${each.value.target_url}/{proxy}"
+  uri                     = "${local.formatted_urls[each.key]}/{proxy}"
   connection_type         = "VPC_LINK"
   connection_id           = aws_api_gateway_vpc_link.main.id
   
@@ -87,7 +94,7 @@ resource "aws_api_gateway_integration" "root" {
   http_method             = aws_api_gateway_method.root[each.key].http_method
   integration_http_method = "ANY"
   type                    = "HTTP_PROXY"
-  uri                     = "http://${each.value.target_url}/"
+  uri                     = "${local.formatted_urls[each.key]}/"
   connection_type         = "VPC_LINK"
   connection_id           = aws_api_gateway_vpc_link.main.id
 }

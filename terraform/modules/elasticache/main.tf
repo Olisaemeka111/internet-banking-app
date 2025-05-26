@@ -23,6 +23,8 @@ resource "aws_elasticache_replication_group" "redis" {
   security_group_ids            = [var.redis_sg_id]
   automatic_failover_enabled    = var.environment == "prod" ? true : false
   multi_az_enabled              = var.environment == "prod" ? true : false
+  engine                        = "redis"
+  engine_version                = "6.2"
   
   num_cache_clusters            = var.environment == "prod" ? 2 : 1
   

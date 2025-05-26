@@ -16,6 +16,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "security_reports_lifecycle" {
     id     = "delete-old-reports"
     status = "Enabled"
 
+    filter {
+      prefix = ""
+    }
+
     expiration {
       days = 90
     }
