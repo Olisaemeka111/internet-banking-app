@@ -25,7 +25,7 @@ waf_allowed_countries = ["US", "CA", "GB"]
 # CodePipeline Configuration
 aws_account_id = "156041437006"  # Actual AWS account ID
 codestar_connection_arn = "arn:aws:codestar-connections:us-east-1:156041437006:connection/063c7eb0-7e04-4882-9a5a-810294a094cc"  # Actual CodeStar connection ARN
-repository_id = "JavatoDev-com/internet-banking-concept-microservices"  # GitHub repository in format owner/repo
+repository_id = "Olisaemeka111/internet-banking-app"  # GitHub repository in format owner/repo
 branch_name = "main"
 
 # Cross-Region Backup Configuration

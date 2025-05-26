@@ -18,9 +18,9 @@ phases:
     commands:
       - echo Build started on `date`
       - echo Building the Docker image...
-      - cd internet-banking-concept-microservices
-      - echo "Building service: $SERVICE_NAME"
-      - docker build -t $REPOSITORY_URI:latest -f Dockerfile.$SERVICE_NAME .
+      - ls -la
+      - echo "Building service $SERVICE_NAME"
+      - docker build -t $REPOSITORY_URI:latest .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
   
   post_build:
