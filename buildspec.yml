@@ -38,8 +38,8 @@ phases:
       - ls -la
       - echo "FROM public.ecr.aws/docker/library/openjdk:11-jre-slim" > Dockerfile
       - echo "WORKDIR /app" >> Dockerfile
-      - echo "COPY build/libs/*.jar app.jar" >> Dockerfile
-      - echo "ENTRYPOINT [\"java\", \"-jar\", \"/app/app.jar\"]" >> Dockerfile
+      - echo "COPY build/libs/*.jar /app/" >> Dockerfile
+      - echo "ENTRYPOINT [\"java\", \"-jar\", \"/app/*.jar\"]" >> Dockerfile
       - cat Dockerfile
       - docker build -t $REPOSITORY_URI:latest .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
