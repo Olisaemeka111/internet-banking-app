@@ -12,12 +12,8 @@ phases:
     commands:
       - echo Logging in to Amazon ECR...
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-      # Use Amazon ECR Public Gallery as a mirror for Docker Hub images to avoid rate limits
-      - echo Setting up Docker to use Amazon ECR Public Gallery as a mirror...
-      - mkdir -p /etc/docker
-      - echo '{"registry-mirrors": ["https://public.ecr.aws"]}' > /etc/docker/daemon.json
-      - cat /etc/docker/daemon.json
-      - systemctl restart docker || service docker restart || true
+      # Use direct image references to avoid Docker Hub rate limits
+      - echo Using direct ECR Public Gallery references to avoid rate limits...
       - REPOSITORY_URI=$ECR_REPOSITORY_URI
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
