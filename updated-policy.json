@@ -1,0 +1,71 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Action": [
+                "s3:GetObject",
+                "s3:GetObjectVersion",
+                "s3:GetBucketVersioning",
+                "s3:PutObject"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:s3:::dev-internet-banking-artifacts",
+                "arn:aws:s3:::dev-internet-banking-artifacts/*"
+            ]
+        },
+        {
+            "Action": [
+                "codebuild:BatchGetBuilds",
+                "codebuild:StartBuild"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        },
+        {
+            "Action": [
+                "ecs:DescribeServices",
+                "ecs:DescribeTaskDefinition",
+                "ecs:DescribeTasks",
+                "ecs:ListTasks",
+                "ecs:RegisterTaskDefinition",
+                "ecs:UpdateService",
+                "ecs:CreateService",
+                "ecs:DeleteService",
+                "ecs:ListServices",
+                "ecs:ListTaskDefinitions",
+                "ecs:ListClusters",
+                "ecs:RunTask",
+                "ecs:StopTask",
+                "ecs:DeregisterTaskDefinition",
+                "ecs:DescribeClusters",
+                "ecs:CreateTaskSet",
+                "ecs:UpdateTaskSet",
+                "ecs:DeleteTaskSet",
+                "ecs:UpdateClusterSettings",
+                "ecs:PutClusterCapacityProviders"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        },
+        {
+            "Action": [
+                "codestar-connections:UseConnection"
+            ],
+            "Effect": "Allow",
+            "Resource": "arn:aws:codestar-connections:us-east-1:156041437006:connection/063c7eb0-7e04-4882-9a5a-810294a094cc"
+        },
+        {
+            "Action": [
+                "iam:PassRole"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:iam::156041437006:role/dev-ecs-task-role",
+                "arn:aws:iam::156041437006:role/dev-ecs-task-execution-role",
+                "arn:aws:iam::156041437006:role/ecsTaskExecutionRole",
+                "arn:aws:iam::156041437006:role/*"
+            ]
+        }
+    ]
+}

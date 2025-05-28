@@ -1,3 +1,26 @@
+#!/bin/bash
+
+# This script fixes the API Gateway Dockerfile issue by ensuring it uses the correct JAR file
+
+# Navigate to the API Gateway directory
+cd "/Users/olisa/Desktop/Internet banking  app/internet-banking-concept-microservices/internet-banking-api-gateway"
+
+# Create a new Dockerfile that explicitly uses the API Gateway JAR
+cat > Dockerfile << 'EOF'
+FROM eclipse-temurin:21.0.2_13-jre-alpine
+LABEL maintainer="chinthaka@javatodev.com"
+VOLUME /main-app
+ADD build/libs/internet-banking-api-gateway-0.0.1-SNAPSHOT.jar /app/app.jar
+EXPOSE 8082
+COPY wait-for-it.sh wait-for-it.sh
+RUN chmod +x wait-for-it.sh
+# Add bash for wait-for-it.sh
+RUN apk add --no-cache bash
+ENTRYPOINT ["java", "-jar", "-Dspring.profiles.active=docker", "/app/app.jar"]
+EOF
+
+# Update the buildspec.yml to ensure it uses the correct JAR file
+cat > buildspec.yml << 'EOF'
 version: 0.2
 
 phases:
@@ -69,3 +92,77 @@ artifacts:
     - imagedefinitions.json
     - appspec.yml
     - taskdef.json
+EOF
+
+echo "API Gateway Dockerfile and buildspec.yml have been updated."
+
+# Create a new task definition JSON file with the correct image
+cd "/Users/olisa/Desktop/Internet banking  app"
+
+cat > api-gateway-task-definition-fixed.json << 'EOF'
+{
+  "family": "dev-internet-banking-api-gateway",
+  "executionRoleArn": "arn:aws:iam::156041437006:role/dev-ecs-task-execution-role",
+  "taskRoleArn": "arn:aws:iam::156041437006:role/dev-ecs-task-role",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "internet-banking-api-gateway",
+      "image": "156041437006.dkr.ecr.us-east-1.amazonaws.com/internet-banking-api-gateway:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8082,
+          "hostPort": 8082,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "dev"
+        },
+        {
+          "name": "MYSQL_HOST",
+          "value": "dev-banking-core-mysql.c8xim88eux4l.us-east-1.rds.amazonaws.com:3306"
+        },
+        {
+          "name": "POSTGRES_HOST",
+          "value": "dev-keycloak-postgres.c8xim88eux4l.us-east-1.rds.amazonaws.com:5432"
+        },
+        {
+          "name": "REDIS_HOST",
+          "value": "master.dev-internet-banking-redis.e8yk2i.use1.cache.amazonaws.com"
+        },
+        {
+          "name": "EUREKA_CLIENT_SERVICEURL_DEFAULTZONE",
+          "value": "http://dev-internet-banking-service-registry.internal:8081/eureka/"
+        },
+        {
+          "name": "SPRING_CLOUD_CONFIG_URI",
+          "value": "http://dev-internet-banking-config-server.internal:8090"
+        },
+        {
+          "name": "SPRING_ZIPKIN_BASEURL",
+          "value": "http://dev-zipkin.internal:9411"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/dev/internet-banking-api-gateway",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "512",
+  "memory": "1024"
+}
+EOF
+
+echo "API Gateway task definition has been created."

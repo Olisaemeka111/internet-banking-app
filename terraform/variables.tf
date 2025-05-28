@@ -147,11 +147,11 @@ variable "services" {
       name                 = "internet-banking-config-server"
       container_port       = 8090
       host_port            = 8090
-      cpu                  = 512
-      memory               = 1024
+      cpu                  = 256
+      memory               = 512
       desired_count        = 2
       max_capacity         = 4
-      image                = "javatodev/internet-banking-config-server:latest"
+      image                = "156041437006.dkr.ecr.us-east-1.amazonaws.com/internet-banking-config-server:latest"
       health_check_path    = "/actuator/health"
       requires_public_access = false
     },
@@ -159,11 +159,11 @@ variable "services" {
       name                 = "internet-banking-service-registry"
       container_port       = 8081
       host_port            = 8081
-      cpu                  = 512
-      memory               = 1024
+      cpu                  = 256
+      memory               = 512
       desired_count        = 2
       max_capacity         = 4
-      image                = "javatodev/internet-banking-service-registry:latest"
+      image                = "156041437006.dkr.ecr.us-east-1.amazonaws.com/internet-banking-service-registry:latest"
       health_check_path    = "/actuator/health"
       requires_public_access = false
     },
@@ -171,11 +171,11 @@ variable "services" {
       name                 = "internet-banking-api-gateway"
       container_port       = 8082
       host_port            = 8082
-      cpu                  = 1024
-      memory               = 2048
+      cpu                  = 512
+      memory               = 1024
       desired_count        = 2
-      max_capacity         = 6
-      image                = "javatodev/internet-banking-api-gateway:latest"
+      max_capacity         = 4
+      image                = "156041437006.dkr.ecr.us-east-1.amazonaws.com/internet-banking-api-gateway:latest"
       health_check_path    = "/actuator/health"
       requires_public_access = true
     },

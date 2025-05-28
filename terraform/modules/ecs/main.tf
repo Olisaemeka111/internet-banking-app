@@ -343,6 +343,18 @@ resource "aws_ecs_task_definition" "services" {
         {
           name  = "REDIS_HOST"
           value = var.redis_endpoint
+        },
+        {
+          name  = "EUREKA_CLIENT_SERVICEURL_DEFAULTZONE"
+          value = "http://dev-internet-banking-service-registry.internal:8081/eureka/"
+        },
+        {
+          name  = "SPRING_CLOUD_CONFIG_URI"
+          value = "http://dev-internet-banking-config-server.internal:8090"
+        },
+        {
+          name  = "SPRING_ZIPKIN_BASEURL"
+          value = "http://dev-zipkin.internal:9411"
         }
       ]
       
@@ -381,7 +393,7 @@ resource "aws_ecs_service" "public" {
   desired_count                      = each.value.desired_count
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
-  health_check_grace_period_seconds  = 60
+  health_check_grace_period_seconds  = 300
   
   network_configuration {
     subnets          = var.private_subnet_ids
@@ -417,7 +429,7 @@ resource "aws_ecs_service" "private" {
   desired_count                      = each.value.desired_count
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
-  health_check_grace_period_seconds  = 60
+  health_check_grace_period_seconds  = 300
   
   network_configuration {
     subnets          = var.private_subnet_ids

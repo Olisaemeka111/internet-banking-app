@@ -1,0 +1,59 @@
+{
+  "family": "dev-internet-banking-service-registry",
+  "executionRoleArn": "arn:aws:iam::156041437006:role/dev-ecs-task-execution-role",
+  "taskRoleArn": "arn:aws:iam::156041437006:role/dev-ecs-task-role",
+  "networkMode": "awsvpc",
+  "containerDefinitions": [
+    {
+      "name": "internet-banking-service-registry",
+      "image": "156041437006.dkr.ecr.us-east-1.amazonaws.com/internet-banking-service-registry:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8081,
+          "hostPort": 8081,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "dev"
+        },
+        {
+          "name": "MYSQL_HOST",
+          "value": "dev-banking-core-mysql.c8xim88eux4l.us-east-1.rds.amazonaws.com:3306"
+        },
+        {
+          "name": "POSTGRES_HOST",
+          "value": "dev-keycloak-postgres.c8xim88eux4l.us-east-1.rds.amazonaws.com:5432"
+        },
+        {
+          "name": "REDIS_HOST",
+          "value": "master.dev-internet-banking-redis.e8yk2i.use1.cache.amazonaws.com"
+        },
+        {
+          "name": "SPRING_CLOUD_CONFIG_URI",
+          "value": "http://dev-internet-banking-config-server.internal:8090"
+        },
+        {
+          "name": "SPRING_ZIPKIN_BASEURL",
+          "value": "http://dev-zipkin.internal:9411"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/dev/dev-internet-banking-service-registry",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "256",
+  "memory": "512"
+}

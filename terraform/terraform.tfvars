@@ -1,0 +1,6 @@
+environment = "dev"
+aws_account_id = "156041437006"
+codestar_connection_arn = "arn:aws:codestar-connections:us-east-1:156041437006:connection/063c7eb0-7e04-4882-9a5a-810294a094cc"
+repository_id = "Olisaemeka111/internet-banking-app"
+mysql_password = "YourSecurePassword123!"
+postgres_password = "AnotherSecurePassword456!"
