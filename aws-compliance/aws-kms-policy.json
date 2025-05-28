@@ -1,0 +1,152 @@
+{
+  "Version": "2012-10-17",
+  "Id": "internet-banking-pipeline-kms-key-policy",
+  "Statement": [
+    {
+      "Sid": "Enable IAM User Permissions",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::${AWS_ACCOUNT_ID}:root"
+      },
+      "Action": "kms:*",
+      "Resource": "*"
+    },
+    {
+      "Sid": "Allow CodeBuild service to use the key",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "codebuild.amazonaws.com"
+      },
+      "Action": [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:ReEncrypt*",
+        "kms:GenerateDataKey*",
+        "kms:DescribeKey"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "kms:CallerAccount": "${AWS_ACCOUNT_ID}",
+          "kms:ViaService": "codebuild.${AWS_REGION}.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "Allow CodePipeline service to use the key",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "codepipeline.amazonaws.com"
+      },
+      "Action": [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:ReEncrypt*",
+        "kms:GenerateDataKey*",
+        "kms:DescribeKey"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "kms:CallerAccount": "${AWS_ACCOUNT_ID}",
+          "kms:ViaService": "codepipeline.${AWS_REGION}.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "Allow CodeBuild role to use the key",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/CodeBuildServiceRole-InternetBanking"
+      },
+      "Action": [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:ReEncrypt*",
+        "kms:GenerateDataKey*",
+        "kms:DescribeKey"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Allow CodePipeline role to use the key",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/CodePipelineServiceRole-InternetBanking"
+      },
+      "Action": [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:ReEncrypt*",
+        "kms:GenerateDataKey*",
+        "kms:DescribeKey"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Allow S3 service to use the key",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "s3.amazonaws.com"
+      },
+      "Action": [
+        "kms:GenerateDataKey*",
+        "kms:Decrypt"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "kms:CallerAccount": "${AWS_ACCOUNT_ID}",
+          "kms:ViaService": "s3.${AWS_REGION}.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "Allow key administrators to administer the key",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": [
+          "arn:aws:iam::${AWS_ACCOUNT_ID}:role/KeyAdministratorRole",
+          "arn:aws:iam::${AWS_ACCOUNT_ID}:role/SecurityAdminRole"
+        ]
+      },
+      "Action": [
+        "kms:Create*",
+        "kms:Describe*",
+        "kms:Enable*",
+        "kms:List*",
+        "kms:Put*",
+        "kms:Update*",
+        "kms:Revoke*",
+        "kms:Disable*",
+        "kms:Get*",
+        "kms:Delete*",
+        "kms:TagResource",
+        "kms:UntagResource",
+        "kms:ScheduleKeyDeletion",
+        "kms:CancelKeyDeletion"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Allow CloudWatch service to use the key",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "logs.${AWS_REGION}.amazonaws.com"
+      },
+      "Action": [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:ReEncrypt*",
+        "kms:GenerateDataKey*",
+        "kms:DescribeKey"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "ArnLike": {
+          "kms:EncryptionContext:aws:logs:arn": "arn:aws:logs:${AWS_REGION}:${AWS_ACCOUNT_ID}:log-group:/aws/codebuild/internet-banking*"
+        }
+      }
+    }
+  ]
+}

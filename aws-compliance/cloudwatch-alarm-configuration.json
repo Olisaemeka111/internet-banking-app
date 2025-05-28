@@ -1,0 +1,210 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "CloudWatch Alarms for Internet Banking Pipeline Security Monitoring",
+  "Parameters": {
+    "NotificationEmail": {
+      "Type": "String",
+      "Description": "Email address to receive security notifications"
+    },
+    "PipelineName": {
+      "Type": "String",
+      "Default": "internet-banking-secure-pipeline",
+      "Description": "Name of the CodePipeline"
+    },
+    "CodeBuildProjectName": {
+      "Type": "String",
+      "Default": "internet-banking-secure-pipeline",
+      "Description": "Name of the CodeBuild project"
+    }
+  },
+  "Resources": {
+    "SecurityNotificationTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "DisplayName": "Internet Banking Security Notifications",
+        "TopicName": "internet-banking-security-notifications",
+        "KmsMasterKeyId": {"Ref": "SecurityNotificationTopicKey"}
+      }
+    },
+    "SecurityNotificationTopicKey": {
+      "Type": "AWS::KMS::Key",
+      "Properties": {
+        "Description": "KMS key for encrypting SNS security notifications",
+        "EnableKeyRotation": true,
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "Enable IAM User Permissions",
+              "Effect": "Allow",
+              "Principal": {"AWS": {"Fn::Sub": "arn:aws:iam::${AWS::AccountId}:root"}},
+              "Action": "kms:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "Allow SNS to use the key",
+              "Effect": "Allow",
+              "Principal": {"Service": "sns.amazonaws.com"},
+              "Action": [
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:GenerateDataKey*"
+              ],
+              "Resource": "*"
+            }
+          ]
+        }
+      }
+    },
+    "SecurityNotificationSubscription": {
+      "Type": "AWS::SNS::Subscription",
+      "Properties": {
+        "Protocol": "email",
+        "TopicArn": {"Ref": "SecurityNotificationTopic"},
+        "Endpoint": {"Ref": "NotificationEmail"}
+      }
+    },
+    "PipelineFailureAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": "InternetBanking-Pipeline-FailureAlarm",
+        "AlarmDescription": "Alarm if the pipeline fails, which could indicate a security issue",
+        "MetricName": "FailedPipelineCount",
+        "Namespace": "AWS/CodePipeline",
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 1,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "Dimensions": [{
+          "Name": "PipelineName",
+          "Value": {"Ref": "PipelineName"}
+        }],
+        "AlarmActions": [{"Ref": "SecurityNotificationTopic"}]
+      }
+    },
+    "CodeBuildFailureAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": "InternetBanking-CodeBuild-FailureAlarm",
+        "AlarmDescription": "Alarm if CodeBuild fails, which could indicate a security vulnerability",
+        "MetricName": "FailedBuilds",
+        "Namespace": "AWS/CodeBuild",
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 1,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "Dimensions": [{
+          "Name": "ProjectName",
+          "Value": {"Ref": "CodeBuildProjectName"}
+        }],
+        "AlarmActions": [{"Ref": "SecurityNotificationTopic"}]
+      }
+    },
+    "UnauthorizedAPICallsAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": "InternetBanking-UnauthorizedAPICalls",
+        "AlarmDescription": "Alarm if there are unauthorized API calls to the pipeline resources",
+        "MetricName": "UnauthorizedAttemptCount",
+        "Namespace": "CloudTrailMetrics",
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 1,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [{"Ref": "SecurityNotificationTopic"}]
+      }
+    },
+    "RootAccountUsageAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": "InternetBanking-RootAccountUsage",
+        "AlarmDescription": "Alarm if the root account is used, which is against security best practices",
+        "MetricName": "RootAccountUsageCount",
+        "Namespace": "CloudTrailMetrics",
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 1,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [{"Ref": "SecurityNotificationTopic"}]
+      }
+    },
+    "SecurityGroupChangeAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": "InternetBanking-SecurityGroupChange",
+        "AlarmDescription": "Alarm if security groups are changed, which could affect network security",
+        "MetricName": "SecurityGroupEventCount",
+        "Namespace": "CloudTrailMetrics",
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 1,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [{"Ref": "SecurityNotificationTopic"}]
+      }
+    },
+    "IAMPolicyChangeAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": "InternetBanking-IAMPolicyChange",
+        "AlarmDescription": "Alarm if IAM policies are changed, which could affect access controls",
+        "MetricName": "IAMPolicyEventCount",
+        "Namespace": "CloudTrailMetrics",
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 1,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [{"Ref": "SecurityNotificationTopic"}]
+      }
+    },
+    "S3BucketPolicyChangeAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": "InternetBanking-S3BucketPolicyChange",
+        "AlarmDescription": "Alarm if S3 bucket policies are changed, which could affect artifact security",
+        "MetricName": "S3BucketPolicyEventCount",
+        "Namespace": "CloudTrailMetrics",
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 1,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [{"Ref": "SecurityNotificationTopic"}]
+      }
+    },
+    "KMSKeyDisableOrDeleteAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": "InternetBanking-KMSKeyDisableOrDelete",
+        "AlarmDescription": "Alarm if KMS keys are disabled or scheduled for deletion",
+        "MetricName": "KMSKeyEventCount",
+        "Namespace": "CloudTrailMetrics",
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 1,
+        "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+        "TreatMissingData": "notBreaching",
+        "AlarmActions": [{"Ref": "SecurityNotificationTopic"}]
+      }
+    }
+  },
+  "Outputs": {
+    "SecurityNotificationTopicARN": {
+      "Description": "ARN of the SNS topic for security notifications",
+      "Value": {"Ref": "SecurityNotificationTopic"}
+    }
+  }
+}
