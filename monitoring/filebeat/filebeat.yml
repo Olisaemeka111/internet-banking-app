@@ -1,0 +1,107 @@
+filebeat.inputs:
+- type: container
+  paths:
+    - '/var/lib/docker/containers/*/*.log'
+  json.message_key: log
+  json.keys_under_root: true
+  processors:
+    - add_docker_metadata:
+        host: "unix:///var/run/docker.sock"
+    - decode_json_fields:
+        fields: ["message"]
+        target: ""
+        overwrite_keys: true
+
+# Additional log files from banking services
+- type: log
+  enabled: true
+  paths:
+    - /var/log/banking-services/*.log
+  fields:
+    application: banking-services
+  fields_under_root: true
+  multiline.pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}'  # Match ISO timestamp at start of log line
+  multiline.negate: true
+  multiline.match: after
+
+# Special handling for audit logs
+- type: log
+  enabled: true
+  paths:
+    - /var/log/banking-services/audit/*.log
+  fields:
+    type: audit
+    application: banking-services
+  fields_under_root: true
+  json.keys_under_root: true
+  json.add_error_key: true
+
+processors:
+  - add_host_metadata: ~
+  - add_cloud_metadata: ~
+  - add_docker_metadata: ~
+  - add_kubernetes_metadata: ~
+  - add_fields:
+      target: ''
+      fields:
+        environment: production
+        application_group: banking
+
+  # Filter out heartbeat messages
+  - drop_event:
+      when:
+        contains:
+          message: "Heartbeat"
+
+  # Add processing for security events
+  - if:
+      equals:
+        type: "security"
+    then:
+      - add_tags:
+          tags: ["security-event"]
+      - add_fields:
+          target: ''
+          fields:
+            priority: high
+
+  # Add processing for audit events
+  - if:
+      equals:
+        type: "audit"
+    then:
+      - add_tags:
+          tags: ["audit-event"]
+      - add_fields:
+          target: ''
+          fields:
+            compliance: true
+
+output.elasticsearch:
+  hosts: ["${ELASTICSEARCH_HOSTS}"]
+  username: "${ELASTICSEARCH_USERNAME}"
+  password: "${ELASTICSEARCH_PASSWORD}"
+  indices:
+    - index: "filebeat-docker-%{+yyyy.MM.dd}"
+      when.equals:
+        docker.container.labels.logging: "filebeat"
+    - index: "filebeat-banking-services-%{+yyyy.MM.dd}"
+      when.equals:
+        application: "banking-services"
+    - index: "filebeat-audit-%{+yyyy.MM.dd}"
+      when.equals:
+        type: "audit"
+    - index: "filebeat-security-%{+yyyy.MM.dd}"
+      when.equals:
+        type: "security"
+
+setup.kibana:
+  host: "${KIBANA_HOST}"
+  username: "${ELASTICSEARCH_USERNAME}"
+  password: "${ELASTICSEARCH_PASSWORD}"
+
+setup.dashboards.enabled: true
+setup.template.enabled: true
+
+logging.json: true
+logging.metrics.enabled: true

@@ -1,0 +1,183 @@
+# Secure CI/CD Pipeline Configuration
+
+name: Secure Build and Deploy
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: 21
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Run OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'Internet-Banking-App'
+          path: '.'
+          format: 'HTML'
+          out: 'reports'
+          args: >-
+            --failOnCVSS 7
+            --enableRetired
+
+      - name: Upload dependency check report
+        uses: actions/upload-artifact@v3
+        with:
+          name: dependency-check-report
+          path: reports
+
+      - name: Run Checkov scan
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: all
+          skip_path: '.git,.github'
+          output_format: cli,sarif
+          output_file: checkov-results.sarif
+
+      - name: Upload Checkov report
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: checkov-results.sarif
+
+      - name: Run TFSec
+        if: hashFiles('**/*.tf') != ''
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          soft_fail: false
+
+      - name: Scan for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    name: Build and Test
+    needs: security-scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: 21
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew clean build
+
+      - name: Run unit tests
+        run: ./gradlew test
+
+      - name: Run integration tests
+        run: ./gradlew integrationTest
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: '**/build/reports/tests/'
+
+  container-scan:
+    name: Container Security Scan
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker images
+        run: |
+          docker-compose -f docker-compose/docker-compose-secure.yml build
+
+      - name: Scan Docker images with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'javatodev/internet-banking-api-gateway:latest'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: trivy-results.sarif
+
+  deploy:
+    name: Deploy to Staging
+    needs: [build, container-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Tag and push Docker images
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          # Tag and push each service image
+          docker-compose -f docker-compose/docker-compose-secure.yml build
+          docker tag javatodev/internet-banking-api-gateway:latest $ECR_REGISTRY/internet-banking-api-gateway:${{ github.sha }}
+          docker push $ECR_REGISTRY/internet-banking-api-gateway:${{ github.sha }}
+          # Repeat for other services
+
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service --cluster banking-cluster --service api-gateway-service --force-new-deployment
+
+  security-audit:
+    name: Post-Deployment Security Audit
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run OWASP ZAP scan
+        uses: zaproxy/action-full-scan@v0.4.0
+        with:
+          target: 'https://staging-api.example.com'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+
+      - name: Upload ZAP scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: zap-scan-results
+          path: zap-results/

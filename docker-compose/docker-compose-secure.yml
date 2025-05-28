@@ -1,0 +1,284 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_javatodev_app
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD_FILE=/run/secrets/mysql_root_password
+      - MYSQL_DATABASE=banking_core_service
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - banking-network
+    secrets:
+      - mysql_root_password
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  keycloak_postgre_db:
+    image: postgres:13
+    container_name: keycloak_postgre_db
+    restart: always
+    environment:
+      - POSTGRES_DB=keycloak
+      - POSTGRES_USER_FILE=/run/secrets/postgres_user
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - banking-network
+    secrets:
+      - postgres_user
+      - postgres_password
+    security_opt:
+      - no-new-privileges:true
+
+  keycloak_web:
+    image: quay.io/keycloak/keycloak:20.0.1
+    container_name: keycloak_web
+    restart: always
+    command:
+      - start-dev
+      - --import-realm
+    depends_on:
+      - keycloak_postgre_db
+    environment:
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://keycloak_postgre_db:5432/keycloak
+      - KC_DB_USERNAME_FILE=/run/secrets/keycloak_db_user
+      - KC_DB_PASSWORD_FILE=/run/secrets/keycloak_db_password
+      - KEYCLOAK_ADMIN_FILE=/run/secrets/keycloak_admin
+      - KEYCLOAK_ADMIN_PASSWORD_FILE=/run/secrets/keycloak_admin_password
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    networks:
+      - banking-network
+    secrets:
+      - keycloak_db_user
+      - keycloak_db_password
+      - keycloak_admin
+      - keycloak_admin_password
+    security_opt:
+      - no-new-privileges:true
+
+  zipkin:
+    image: openzipkin/zipkin:2.23
+    container_name: openzipkin_server
+    restart: always
+    ports:
+      - "9411:9411"
+    networks:
+      - banking-network
+    security_opt:
+      - no-new-privileges:true
+
+  config-server:
+    image: javatodev/internet-banking-config-server:latest
+    container_name: internet-banking-config-server
+    restart: always
+    ports:
+      - "8090:8090"
+    networks:
+      - banking-network
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  service-registry:
+    image: javatodev/internet-banking-service-registry:latest
+    container_name: internet-banking-service-registry
+    restart: always
+    ports:
+      - "8081:8081"
+    networks:
+      - banking-network
+    depends_on:
+      - config-server
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  api-gateway:
+    image: javatodev/internet-banking-api-gateway:latest
+    container_name: internet-banking-api-gateway
+    restart: always
+    ports:
+      - "8082:8082"
+    networks:
+      - banking-network
+    depends_on:
+      - service-registry
+    environment:
+      - SPRING_ZIPKIN_BASEURL=http://zipkin:9411
+      - RATE_LIMIT_REQUESTS_PER_SECOND=20
+      - ENABLE_INPUT_VALIDATION=true
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  user-service:
+    image: javatodev/internet-banking-user-service:latest
+    container_name: internet-banking-user-service
+    restart: always
+    ports:
+      - "8083:8083"
+    networks:
+      - banking-network
+    depends_on:
+      - service-registry
+      - keycloak_web
+    environment:
+      - SPRING_ZIPKIN_BASEURL=http://zipkin:9411
+      - KEYCLOAK_AUTH_SERVER_URL=http://keycloak_web:8080
+      - SPRING_DATASOURCE_PASSWORD_FILE=/run/secrets/user_service_db_password
+      - ENCRYPT_KEY_FILE=/run/secrets/encrypt_key
+    secrets:
+      - user_service_db_password
+      - encrypt_key
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  fund-transfer-service:
+    image: javatodev/internet-banking-fund-transfer-service:latest
+    container_name: internet-banking-fund-transfer-service
+    restart: always
+    ports:
+      - "8084:8084"
+    networks:
+      - banking-network
+    depends_on:
+      - service-registry
+    environment:
+      - SPRING_ZIPKIN_BASEURL=http://zipkin:9411
+      - SPRING_DATASOURCE_PASSWORD_FILE=/run/secrets/fund_service_db_password
+      - ENCRYPT_KEY_FILE=/run/secrets/encrypt_key
+    secrets:
+      - fund_service_db_password
+      - encrypt_key
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8084/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  utility-payment-service:
+    image: javatodev/internet-banking-utility-payment-service:latest
+    container_name: internet-banking-utility-payment-service
+    restart: always
+    ports:
+      - "8085:8085"
+    networks:
+      - banking-network
+    depends_on:
+      - service-registry
+    environment:
+      - SPRING_ZIPKIN_BASEURL=http://zipkin:9411
+      - SPRING_DATASOURCE_PASSWORD_FILE=/run/secrets/utility_service_db_password
+      - ENCRYPT_KEY_FILE=/run/secrets/encrypt_key
+    secrets:
+      - utility_service_db_password
+      - encrypt_key
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  core-banking-service:
+    image: javatodev/core-banking-service:latest
+    container_name: core-banking-service
+    restart: always
+    ports:
+      - "8092:8092"
+    networks:
+      - banking-network
+    depends_on:
+      - service-registry
+      - mysql
+    environment:
+      - SPRING_ZIPKIN_BASEURL=http://zipkin:9411
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/banking_core_service?useSSL=false
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD_FILE=/run/secrets/core_service_db_password
+      - ENCRYPT_KEY_FILE=/run/secrets/encrypt_key
+    secrets:
+      - core_service_db_password
+      - encrypt_key
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8092/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+secrets:
+  mysql_root_password:
+    file: ./secrets/mysql_root_password.txt
+  postgres_user:
+    file: ./secrets/postgres_user.txt
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  keycloak_db_user:
+    file: ./secrets/keycloak_db_user.txt
+  keycloak_db_password:
+    file: ./secrets/keycloak_db_password.txt
+  keycloak_admin:
+    file: ./secrets/keycloak_admin.txt
+  keycloak_admin_password:
+    file: ./secrets/keycloak_admin_password.txt
+  user_service_db_password:
+    file: ./secrets/user_service_db_password.txt
+  fund_service_db_password:
+    file: ./secrets/fund_service_db_password.txt
+  utility_service_db_password:
+    file: ./secrets/utility_service_db_password.txt
+  core_service_db_password:
+    file: ./secrets/core_service_db_password.txt
+  encrypt_key:
+    file: ./secrets/encrypt_key.txt
+
+volumes:
+  mysql-data:
+  postgres-data:
+
+networks:
+  banking-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/24

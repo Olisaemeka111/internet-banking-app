@@ -1,0 +1,226 @@
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.40.0
+    container_name: prometheus
+    restart: always
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring-network
+    security_opt:
+      - no-new-privileges:true
+
+  grafana:
+    image: grafana/grafana:9.3.2
+    container_name: grafana
+    restart: always
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD__FILE=/run/secrets/grafana_admin_password
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_DOMAIN=localhost
+      - GF_SMTP_ENABLED=false
+    ports:
+      - "3000:3000"
+    networks:
+      - monitoring-network
+    depends_on:
+      - prometheus
+    secrets:
+      - grafana_admin_password
+    security_opt:
+      - no-new-privileges:true
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.8
+    container_name: elasticsearch
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - ELASTIC_PASSWORD_FILE=/run/secrets/elastic_password
+      - xpack.security.enabled=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - monitoring-network
+    secrets:
+      - elastic_password
+    security_opt:
+      - no-new-privileges:true
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.17.8
+    container_name: logstash
+    restart: always
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USER=elastic
+      - ELASTICSEARCH_PASSWORD_FILE=/run/secrets/elastic_password
+    ports:
+      - "5044:5044"
+      - "5000:5000/tcp"
+      - "5000:5000/udp"
+      - "9600:9600"
+    networks:
+      - monitoring-network
+    depends_on:
+      - elasticsearch
+    secrets:
+      - elastic_password
+    security_opt:
+      - no-new-privileges:true
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.17.8
+    container_name: kibana
+    restart: always
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD_FILE=/run/secrets/elastic_password
+    ports:
+      - "5601:5601"
+    networks:
+      - monitoring-network
+    depends_on:
+      - elasticsearch
+    secrets:
+      - elastic_password
+    security_opt:
+      - no-new-privileges:true
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:7.17.8
+    container_name: filebeat
+    restart: always
+    user: root
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log:/var/log:ro
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD_FILE=/run/secrets/elastic_password
+      - KIBANA_HOST=kibana:5601
+    networks:
+      - monitoring-network
+    depends_on:
+      - elasticsearch
+      - kibana
+    secrets:
+      - elastic_password
+    security_opt:
+      - no-new-privileges:true
+
+  wazuh-manager:
+    image: wazuh/wazuh-manager:4.3.10
+    container_name: wazuh-manager
+    restart: always
+    ports:
+      - "1514:1514"
+      - "1515:1515"
+      - "514:514/udp"
+      - "55000:55000"
+    volumes:
+      - wazuh-manager-data:/var/ossec/data
+      - wazuh-manager-etc:/var/ossec/etc
+      - wazuh-manager-logs:/var/ossec/logs
+    networks:
+      - monitoring-network
+    security_opt:
+      - no-new-privileges:true
+
+  wazuh-indexer:
+    image: wazuh/wazuh-indexer:4.3.10
+    container_name: wazuh-indexer
+    restart: always
+    environment:
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - bootstrap.memory_lock=true
+      - node.name=wazuh-indexer
+      - discovery.seed_hosts=wazuh-indexer
+      - cluster.initial_master_nodes=wazuh-indexer
+      - cluster.name=wazuh-cluster
+      - OPENSEARCH_PATH_CONF=/usr/share/wazuh-indexer/config
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - wazuh-indexer-data:/var/lib/wazuh-indexer
+    ports:
+      - "9200:9200"
+    networks:
+      - monitoring-network
+    security_opt:
+      - no-new-privileges:true
+
+  wazuh-dashboard:
+    image: wazuh/wazuh-dashboard:4.3.10
+    container_name: wazuh-dashboard
+    restart: always
+    depends_on:
+      - wazuh-indexer
+    ports:
+      - "443:443"
+    environment:
+      - OPENSEARCH_HOSTS=https://wazuh-indexer:9200
+      - WAZUH_API_URL=https://wazuh-manager
+      - API_USERNAME=wazuh-wui
+      - API_PASSWORD_FILE=/run/secrets/wazuh_api_password
+    volumes:
+      - wazuh-dashboard-config:/usr/share/wazuh-dashboard/config
+    networks:
+      - monitoring-network
+    secrets:
+      - wazuh_api_password
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  monitoring-network:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  elasticsearch-data:
+  wazuh-manager-data:
+  wazuh-manager-etc:
+  wazuh-manager-logs:
+  wazuh-indexer-data:
+  wazuh-dashboard-config:
+
+secrets:
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password.txt
+  elastic_password:
+    file: ./secrets/elastic_password.txt
+  wazuh_api_password:
+    file: ./secrets/wazuh_api_password.txt

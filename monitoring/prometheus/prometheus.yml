@@ -1,0 +1,53 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "banking-services"
+    metrics_path: '/actuator/prometheus'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ["internet-banking-api-gateway:8082"]
+        labels:
+          service: "api-gateway"
+      - targets: ["internet-banking-user-service:8083"]
+        labels:
+          service: "user-service"
+      - targets: ["internet-banking-fund-transfer-service:8084"]
+        labels:
+          service: "fund-transfer-service"
+      - targets: ["internet-banking-utility-payment-service:8085"]
+        labels:
+          service: "utility-payment-service"
+      - targets: ["core-banking-service:8092"]
+        labels:
+          service: "core-banking-service"
+      - targets: ["internet-banking-config-server:8090"]
+        labels:
+          service: "config-server"
+      - targets: ["internet-banking-service-registry:8081"]
+        labels:
+          service: "service-registry"
+
+  - job_name: "infrastructure"
+    static_configs:
+      - targets: ["cadvisor:8080"]
+        labels:
+          service: "cadvisor"
+      - targets: ["node-exporter:9100"]
+        labels:
+          service: "node-exporter"
